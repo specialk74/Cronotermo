@@ -318,7 +318,7 @@ def plot_temp():
 
 if __name__ == '__main__':
     Path("/home/pi/data").mkdir(parents=True, exist_ok=True)
-    with open("openweathermap_apikey.txt", "r") as f:
+    with open("/home/pi/Cronotermo/openweathermap_apikey.txt", "r") as f:
         API_KEY = f.readline().rstrip()
         CITY = f.readline().rstrip()
     print("API_KEY: " + API_KEY)
