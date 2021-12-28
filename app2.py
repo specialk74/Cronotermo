@@ -17,7 +17,9 @@ import matplotlib.dates as mdates
 import base64
 import io
 import random
-
+# importing requests and json
+import requests, json
+    
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Ridge
 from datetime import datetime
@@ -27,6 +29,49 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from flask import Flask, render_template, send_file, make_response, request 
 from matplotlib.dates import HourLocator, MonthLocator, YearLocator
+from apscheduler.schedulers.background import BackgroundScheduler
+
+# base URL
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather?"
+CITY = ""
+API_KEY = ""
+URL=""
+# upadting the URL
+zone = [
+        {'luogo': 'Salone', 'colonna': '18363'},
+        {'luogo': 'Palestra', 'colonna': '2'},
+        {'luogo': 'Cantina', 'colonna': '11618'},
+    ]
+
+def sensor():
+    # HTTP request
+    response = requests.get(URL)
+    # checking the status code of the request
+    if response.status_code == 200:
+       # getting data in the json format
+       data = response.json()
+       # getting the main dict block
+       main = data['main']
+       # getting temperature
+       temperature = main['temp']
+       # getting the humidity
+       #humidity = main['humidity']
+       # getting the pressure
+       #pressure = main['pressure']
+       # weather report
+       #report = data['weather']
+       #print("City: " + CITY)
+       #print("Temperature: " + str(temperature - 273.15))
+       
+       newDict = dict({"id": CITY, "1": temperature - 273.15})
+       WriteToFile (newDict)
+    else:
+       # showing the error message
+       print("Error in the HTTP request")
+
+sched = BackgroundScheduler(daemon=True)
+sched.add_job(sensor,'interval',minutes=1)
+sched.start()
 
 app = flask.Flask(__name__)
 port = int(os.getenv("PORT", 9099))
@@ -122,6 +167,16 @@ def ReadTodayFile(id, days = 0):
         output = pd.read_csv(nomeFile, parse_dates=["Data"])
     return output, nomeFile, now
 
+def WriteToFile(req):
+    output, nomeFile, now = ReadTodayFile(req['id'])
+    # Recupera tutti i dati ricevuti, togliendo solo l'id (Cantina, Salone, ...)
+    # Crea un nuovo dizionario da scrivere dentro il file
+    newDict = dict(filter(lambda elem: elem[0] != 'id', req.items()))
+    
+    newDict['Data'] = now.strftime("%Y/%m/%d %H:%M")
+    output = output.append(newDict, ignore_index=True)
+    output.to_csv(nomeFile, index=False)
+
 @app.route('/data3', methods=['POST'])
 def data3():
     #print('\tdata3\tflask.request.data\t'+str(flask.request.data))
@@ -129,7 +184,9 @@ def data3():
     #value = flask.request.get_json(force=True)['value']
     #print('\tdata3\tvalue: '+str(value[0])+' - token: '+str(token))
 
+    # req e' un dizionario
     req = flask.request.get_json(force=True)
+    #print(req)
     #print('\tdata3\tflask.request.get_json\t'+str(req))
     #print('\tdata3\tflask.request.args\t'+str(flask.request.args))
     #print('\tdata3\tflask.request.form\t'+str(flask.request.form))
@@ -146,12 +203,7 @@ def data3():
     #if os.path.exists(nomeFile) == True:
     #    output = pd.read_csv(nomeFile, parse_dates=True)
     
-    output, nomeFile, now = ReadTodayFile(req['id'])
-    newDict = dict(filter(lambda elem: elem[0] != 'id', req.items()))
-    
-    newDict['Data'] = now.strftime("%Y/%m/%d %H:%M")
-    output = output.append(newDict, ignore_index=True)
-    output.to_csv(nomeFile, index=False)
+    WriteToFile(req)
     
     response = {'result': 'OK!'}
         
@@ -202,6 +254,25 @@ html = '''
 </html>
 '''
 
+def disegna(x,y,_label):
+    plt.plot(x,y, label=_label)
+    plt.annotate('%0.2f' % y.iloc[-1], 
+                    xy=(1, y.iloc[-1]), 
+                    xytext=(-35, 0), 
+                    xycoords=('axes fraction', 'data'), 
+                    textcoords='offset points',
+                    color=plt.gca().lines[-1].get_color()
+                    )
+    #plt.axhline(y=y.iloc[-1], 
+    #            color='y', 
+    #            linestyle='-.')
+
+def prelevaAndDisegna(_luogo, _colonna, _days):
+    samples, nomeFile, now = ReadTodayFile(_luogo, _days)
+    if not samples.isin([_colonna]).empty:
+        disegna(samples['Data'], samples[_colonna], _luogo)
+    return now
+        
 @app.route('/plot', methods=['GET'])
 def plot_temp():
     days = 0
@@ -221,31 +292,10 @@ def plot_temp():
     else:
         fig = plt.figure(figsize=[20,10])        
 
-        samples, nomeFile, now = ReadTodayFile('Salone', days)
-        if not samples.isin(['18363']).empty:
-            x = samples['Data']
-            y = samples['18363']
-            plt.plot(x,y, label='Salone')
-            #samples['18363'].plot(grid=True, label='Salone', legend=True)
-            
-        #ax = samples['18363'].plot(label='Salone', legend=True)
-        
-        samples, nomeFile, now = ReadTodayFile('Palestra', days)
-        if not samples.isin(['2']).empty:        
-            #samples.plot(grid=True, label='Palestra', legend=True)
-            x = samples['Data']
-            y = samples['2']
-            plt.plot(x,y, label='Palestra')
-        
-        samples, nomeFile, now = ReadTodayFile('Cantina', days)    
-        if not samples.isin(['11618']).empty:
-            x = samples['Data']
-            y = samples['11618']
-            plt.plot(x,y, label='Cantina')
-            
+        for var in zone:
+            print("prelevaAndDisegna - luogo: " + str(var['luogo']) + " colonna: " + str(var['colonna']))
+            now = prelevaAndDisegna(var['luogo'], var['colonna'], days)
 
-            #samples['11618'].plot(grid=True, label='Cantina', legend=True)
-            #samples.plot(x='Data', y='11618', grid=True, label='Cantina', legend=True)
         title = 'Temperature - '
 
     plt.gca().xaxis.set_major_locator(HourLocator(byhour=None, interval=1, tz=None))
@@ -268,4 +318,12 @@ def plot_temp():
 
 if __name__ == '__main__':
     Path("/home/pi/data").mkdir(parents=True, exist_ok=True)
+    with open("openweathermap_apikey.txt", "r") as f:
+        API_KEY = f.readline().rstrip()
+        CITY = f.readline().rstrip()
+    print("API_KEY: " + API_KEY)
+    print("CITY: " + CITY)
+    URL = BASE_URL + "q=" + CITY + "&appid=" + API_KEY
+    zone.append({'luogo': CITY, 'colonna': '1'})
+    print(zone)
     app.run(host='0.0.0.0', port=port, threaded=True)
