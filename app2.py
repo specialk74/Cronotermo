@@ -254,15 +254,36 @@ html = '''
 </html>
 '''
 
+def annot_max(x,y,color):
+    xmax = x[np.argmax(y)]
+    ymax = y.max()
+    #text= "x={:.3f}, y={:.3f}".format(xmax, ymax)
+    text= "{:.2f}".format(ymax)
+    ax=plt.gca()
+    #bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
+    #arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=60")
+    #kw = dict(xycoords='data',textcoords="axes fraction", arrowprops=arrowprops, bbox=bbox_props, ha="right", va="top")
+    kw = dict(xycoords='data', ha="right", va="top", color=color)
+    #ax.annotate(text, xy=(xmax, ymax), xytext=(0.94,0.96), **kw)
+    ax.annotate(text, xy=(xmax, ymax), xytext=(xmax,ymax+0.3), **kw)
+    
+    xmin = x[np.argmin(y)]
+    ymin = y.min()
+    text= "{:.2f}".format(ymin)
+    ax.annotate(text, xy=(xmin, ymin), xytext=(xmin,ymin-0.3), **kw)
+    
+
 def disegna(x,y,_label):
     plt.plot(x,y, label=_label)
+    color=plt.gca().lines[-1].get_color()
     plt.annotate('%0.2f' % y.iloc[-1], 
                     xy=(1, y.iloc[-1]), 
                     xytext=(-35, 0), 
                     xycoords=('axes fraction', 'data'), 
                     textcoords='offset points',
-                    color=plt.gca().lines[-1].get_color()
+                    color=color
                     )
+    annot_max(x,y,color)
     #plt.axhline(y=y.iloc[-1], 
     #            color='y', 
     #            linestyle='-.')
