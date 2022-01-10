@@ -29,7 +29,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from flask import Flask, render_template, send_file, make_response, request 
 from matplotlib.dates import HourLocator, MonthLocator, YearLocator
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
+from flask_apscheduler import APScheduler
 
 # base URL
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather?"
@@ -69,12 +70,9 @@ def sensor():
        # showing the error message
        print("Error in the HTTP request")
 
-sched = BackgroundScheduler(daemon=True)
-sched.add_job(sensor,'interval',minutes=1)
-sched.start()
-
 app = flask.Flask(__name__)
 port = int(os.getenv("PORT", 9099))
+scheduler = APScheduler()
 
 x = np.arange(0, 128, 1)
 
@@ -347,4 +345,8 @@ if __name__ == '__main__':
     URL = BASE_URL + "q=" + CITY + "&appid=" + API_KEY
     zone.append({'luogo': CITY, 'colonna': '1'})
     print(zone)
+    
+    scheduler.add_job(id = 'Scheduled Task', func=sensor, trigger="interval", minutes=1)
+    scheduler.start()
+    
     app.run(host='0.0.0.0', port=port, threaded=True)
