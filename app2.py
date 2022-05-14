@@ -244,14 +244,6 @@ def data4():
         
     return flask.jsonify(response)    
 
-html = '''
-<html>
-    <body>
-        <img src="data:image/png;base64,{}" />
-    </body>
-</html>
-'''
-
 def annot_max(x,y,color):
     xmax = x[np.argmax(y)]
     ymax = y.max()
@@ -291,12 +283,31 @@ def prelevaAndDisegna(_luogo, _colonna, _days):
     if not samples.isin([_colonna]).empty:
         disegna(samples['Data'], samples[_colonna], _luogo)
     return now
-        
+    
+def AddDays(days, text):
+    html = '<a href="http://specialk74.no-ip.org:{}/plot'.format(port)
+    if days > 0:
+        html += '?days={}'.format(days)
+    html += '">'
+    html += text
+    html += '</a>    '
+    return html
+    
 @app.route('/plot', methods=['GET'])
 def plot_temp():
     days = 0
     if 'days' in request.args:
         days = int(request.args.get('days')) #if key doesn't exist, returns None
+    
+    html = '<html><body>'
+    html += AddDays(days + 10, 'Prev(10)')
+    html += AddDays(days + 1, 'Prev')
+    if days > 0:
+        html += AddDays(0, 'Today')
+    if days > 1:
+        html += AddDays(days-1, 'Next')
+    if days > 10:
+        html += AddDays(days-10, 'Next(10)')
 
     if 'watt' in request.args:
         fig = plt.figure(figsize=[20,20])
@@ -309,7 +320,7 @@ def plot_temp():
         samples['watt'].plot(label='Watt', legend=True, grid=True)
         title = 'Watt - '
     else:
-        fig = plt.figure(figsize=[20,10])        
+        fig = plt.figure(figsize=[20,10])
 
         for var in zone:
             print("prelevaAndDisegna - luogo: " + str(var['luogo']) + " colonna: " + str(var['colonna']))
@@ -333,7 +344,9 @@ def plot_temp():
     fig.savefig(pngImage, format='png')
     pngImageB64String = base64.b64encode(pngImage.getvalue()).decode('utf8')
     
-    return html.format(pngImageB64String)
+    html += '<img src="data:image/png;base64,{}" />'.format(pngImageB64String)
+    html += '</body> </html>'
+    return html
 
 if __name__ == '__main__':
     Path("/home/pi/data").mkdir(parents=True, exist_ok=True)
